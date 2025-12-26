@@ -1,4 +1,5 @@
 #!/bin/bash
+source ./config.sh
 
 check_dependencies() {
     if ! command -v jq &> /dev/null; then
@@ -24,5 +25,33 @@ check_internet() {
   if ! ping -c 1 8.8.8.8 &> /dev/null; then
     log_error "No internet connection."
     exit 1
+  fi
+}
+
+
+require_positive_int() {
+  local value="$1"
+
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    error "Value must be a positive integer: $value"
+  fi
+}
+
+
+require_year() {
+  local year="$1"
+
+  if ! [[ "$year" =~ ^[0-9]{4}$ ]]; then
+    error "Invalid year: $year"
+  fi
+}
+
+
+
+validate_metric() {
+  local metric="$1"
+
+  if [[ -z "${METRIC_MAP[$metric]:-}" ]]; then
+    error "Unknown metric: $metric (available: ${!METRIC_MAP[*]})"
   fi
 }

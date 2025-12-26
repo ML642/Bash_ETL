@@ -1,50 +1,88 @@
 #!/bin/bash
+set -euo pipefail
 
 source ./utils.sh
-source ./fetch_data
+source ./fetch_data.sh
+source ./transform.sh
+source ./load.sh
+source ./config.sh
 
-START_YEAR=2015
-END_YEAR=2024
 DATA_DIR="./data"
+RAW_DIR="$DATA_DIR/raw"
+OUT_DIR="$DATA_DIR/output"
 
-mkdir -p "$DATA_DIR"
-
+mkdir -p "$RAW_DIR" "$OUT_DIR"
+ 
+ 
 echo "========================================="
-echo "World Bank Data Fetcher (Bash ETL)"
+echo "Bash ETL – World Bank Country Ranking"
 echo "========================================="
 
+YEAR=""
+METRIC=""
+MODE=""
+N=""
 
-echo ""
-echo "Step 1: Fetching top 10 countries by GDP..."
-
-TOP_GDP_COUNTRIES=$(get_top_gdp_countries 2023 10)
-
-echo "Top 10 GDP countries: $TOP_GDP_COUNTRIES"
-sleep 1
-
-
-echo ""
-echo "Step 2: Fetching bottom 10 countries by unemployment rate..."
-
-LOWEST_UNEMP_COUNTRIES=$(get_lowest_unemployment_countries 2023 10)
-
-echo "Bottom 10 lowest unemployment countries: $LOWEST_UNEMP_COUNTRIES"
-sleep 1
-
-
-
-echo ""
-echo "Step 3: Fetching historical data for each country..."
-
-for country in ${TOP_GDP_COUNTRIES//,/ }; do
-    fetch_data "$country" "NY.GDP.MKTP.CD" "gdp" "$START_YEAR" "$END_YEAR" "$DATA_DIR"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --year)
+      YEAR="$2"
+      shift 2
+      ;;
+    --metric)
+      METRIC="$2"
+      shift 2
+      ;;
+    --topn)
+      MODE="top"
+      N="$2"
+      shift 2
+      ;;
+    --leastn)
+      MODE="least"
+      N="$2"
+      shift 2
+      ;;
+    *)
+      error "Unknown argument: $1"
+      ;;
+  esac
 done
 
-for country in ${LOWEST_UNEMP_COUNTRIES//,/ }; do
-    fetch_data "$country" "SL.UEM.TOTL.ZS" "unemployment" "$START_YEAR" "$END_YEAR" "$DATA_DIR"
-done
+
+require_arg "--year" "$YEAR"
+require_arg "--metric" "$METRIC"
+require_arg "--topn|--leastn" "$MODE"
+require_positive_int "$N"
+validate_metric "$METRIC"
+
+
+echo ""
+echo "Step 1: Extracting raw data..."
+fetch_all_countries "$METRIC" "$YEAR" "$RAW_DIR"
+
+
+echo ""
+echo "Step 2: Transforming data..."
+
+RESULT_FILE="$OUT_DIR/${MODE}n_${METRIC}_${YEAR}.csv"
+
+transform_rank_countries \
+  "$RAW_DIR" \
+  "$METRIC" \
+  "$YEAR" \
+  "$MODE" \
+  "$N" \
+  "$RESULT_FILE"
+
+
+echo ""
+echo "Step 3: Loading results..."
+
+print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
 
 echo ""
 echo "========================================="
-echo "✓ ETL Complete! JSON files saved in $DATA_DIR/"
+echo "✓ ETL Complete!"
+echo "Output: $RESULT_FILE"
 echo "========================================="

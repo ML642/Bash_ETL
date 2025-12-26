@@ -1,28 +1,33 @@
 #!/bin/bash
+
+if [[ -n "$FETCH_DATA_INCLUDED" ]]; then
+    return
+fi
+FETCH_DATA_INCLUDED=1
+
+source ./utils.sh
+source ./config.sh
+
 fetch_data() {
-    local country=$1
-    local indicator=$2
-    local name=$3
-    local start_year=$4
-    local end_year=$5
-    local data_dir=$6
+    local country="$1"
+    local metric_code="$2"
+    local metric_name="$3"
+    local start_year="$4"
+    local end_year="$5"
+    local output_dir="$6"
 
-    if [ -z "$country" ] || [ -z "$indicator" ] || [ -z "$name" ] || [ -z "$data_dir" ]; then
-        echo "fetch_data: Missing required arguments!"
-        return 1
-    fi
+    mkdir -p "$output_dir"
 
-    local url="https://api.worldbank.org/v2/country/${country}/indicator/${indicator}?format=json&date=${start_year}:${end_year}&per_page=100"
+    local url="http://api.worldbank.org/v2/country/${country}/indicator/${metric_code}?date=${start_year}:${end_year}&format=json"
 
-    local output_file="${data_dir}/${name}_${country}.json"
+    log_info "Fetching $metric_name data for $country from $start_year to $end_year..."
 
-    echo "Fetching ${name} data for ${country} (${start_year}-${end_year})..."
-    
-    if curl -s -f "$url" -o "$output_file"; then
-        echo "  ✓ Saved to $output_file"
+    local response_file="${output_dir}/${country}_${metric_name}.json"
+
+    # Fetch data using curl
+    if curl -s -f "$url" -o "$response_file"; then
+        log_info "Saved $metric_name data for $country to $response_file"
     else
-        echo "  ✗ Failed to fetch data for $country"
+        log_error "Failed to fetch $metric_name data for $country"
     fi
-
-    sleep 1
 }
