@@ -2,21 +2,17 @@
 set -euo pipefail
 
 source ./utils.sh
+source ./config.sh
 source ./fetch_data.sh
 source ./transform.sh
 source ./load.sh
-source ./config.sh
+source ./transform.sh
 
 DATA_DIR="./data"
 RAW_DIR="$DATA_DIR/raw"
 OUT_DIR="$DATA_DIR/output"
 
 mkdir -p "$RAW_DIR" "$OUT_DIR"
- 
- 
-echo "========================================="
-echo "Bash ETL – World Bank Country Ranking"
-echo "========================================="
 
 YEAR=""
 METRIC=""
@@ -56,15 +52,16 @@ require_arg "--topn|--leastn" "$MODE"
 require_positive_int "$N"
 validate_metric "$METRIC"
 
+log_info "Bash ETL – World Bank Country Ranking"
+log_info "Year: $YEAR | Metric: $METRIC | Mode: $MODE | N: $N"
 
 echo ""
-echo "Step 1: Extracting raw data..."
+log_info "Step 1: Extracting raw data..."
+metric_key="$METRIC"
+METRIC="${METRIC_MAP[$metric_key]}"
 fetch_all_countries "$METRIC" "$YEAR" "$RAW_DIR"
-
-
 echo ""
-echo "Step 2: Transforming data..."
-
+log_info "Step 2: Transforming data..."
 RESULT_FILE="$OUT_DIR/${MODE}n_${METRIC}_${YEAR}.csv"
 
 transform_rank_countries \
@@ -75,14 +72,10 @@ transform_rank_countries \
   "$N" \
   "$RESULT_FILE"
 
-
 echo ""
-echo "Step 3: Loading results..."
-
+log_info "Step 3: Loading results..."
 print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
 
 echo ""
-echo "========================================="
-echo "✓ ETL Complete!"
+log_info "✓ ETL Complete!"
 echo "Output: $RESULT_FILE"
-echo "========================================="
