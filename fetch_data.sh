@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [[ -n "$FETCH_DATA_INCLUDED" ]]; then
-    return
-fi
-FETCH_DATA_INCLUDED=1
-
 source ./utils.sh
 source ./config.sh
 
@@ -30,4 +25,19 @@ fetch_data() {
     else
         log_error "Failed to fetch $metric_name data for $country"
     fi
+}
+fetch_all_countries() {
+    local metric="$1"
+    local year="$2"
+    local raw_dir="$3"
+
+    mkdir -p "$raw_dir"
+
+    local url="https://api.worldbank.org/v2/country/all/indicator/NY.GDP.MKTP.CD?format=json&per_page=20000"
+    local outfile="${raw_dir}/countries_${metric}_${year}.json"
+
+    echo "Fetching $metric for $year..."
+    curl -s "$url" -o "$outfile"
+
+    echo "Saved raw data to $outfile"
 }
