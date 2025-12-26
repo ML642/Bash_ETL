@@ -1,12 +1,6 @@
 #!/bin/bash
 source ./config.sh
-require_arg() {
-    local name="$1"
-    local value="$2"
-    if [[ -z "$value" ]]; then
-        error "Argument $name is required"
-    fi
-}
+
 check_dependencies() {
     if ! command -v jq &> /dev/null; then
         echo "Error: jq is not installed. Please install jq to proceed."
@@ -60,8 +54,4 @@ validate_metric() {
   if [[ -z "${METRIC_MAP[$metric]:-}" ]]; then
     error "Unknown metric: $metric (available: ${!METRIC_MAP[*]})"
   fi
-}
-error() {
-    log_error "$1"
-    exit 1
 }
