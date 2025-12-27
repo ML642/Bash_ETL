@@ -1,52 +1,63 @@
 #!/bin/bash
-source ./utils.sh
-source ./config.sh
 
+# Fast function to rank countries from JSON data
 transform_rank_countries() {
     local raw_dir="$1"
     local metric="$2"
     local year="$3"
-    local mode="$4"  # top or least
+    local mode="$4"    # "top" or "bottom"
     local n="$5"
     local output_file="$6"
 
-    log_info "Transforming data for $metric in $year ($mode $n)..."
+    # Find the JSON file
+    local json_file=$(ls "$raw_dir"/*${metric}*${year}.json 2>/dev/null | head -1)
+    [[ ! -f "$json_file" ]] && { log_error "No JSON file found"; return 1; }
 
-    local tmp_file
-    tmp_file=$(mktemp)
+    log_info "Processing: $json_file"
 
-    # Loop through all JSON files for this metric
-    for file in "$raw_dir"/*_"$metric"*.json; do
-        [[ -f "$file" ]] || continue
+    local temp=$(mktemp)
+    trap "rm -f $temp" RETURN
 
-        # Extract blocks containing the given year
-        awk -v year="$year" '
-            /"country":/ { country=$0 }
-            /"date":/ && $0 ~ year {
-                getline; value=$0
-                # Clean fields
-                gsub(/.*"value":"?/, "", country)
-                gsub(/".*/, "", country)
-                gsub(/.*"value":/, "", value)
-                gsub(/[,}].*/, "", value)
-                print country "," value
-            }
-        ' "$file" >> "$tmp_file"
-    done
+    # Extract all entries for the year in one pass
+    # Pattern: find lines with the year, extract country code and value
+    grep "\"date\":\"$year\"" "$json_file" | \
+        grep -o '"country":{"id":"[^"]*","value":"[^"]*"},"countryiso3code":"[^"]*","date":"'"$year"'","value":[0-9.]*' | \
+        sed 's/"country":{"id":"//' | \
+        sed 's/","value":"/|/' | \
+        sed 's/"},"countryiso3code":"/|/' | \
+        sed 's/","date":"'"$year"'","value":/|/' | \
+        sed 's/$//' > "$temp"
 
-    if [[ ! -s "$tmp_file" ]]; then
-        log_error "No data found for $metric in $year."
-        rm -f "$tmp_file"
-        return 1
-    fi
+    local count=$(wc -l < "$temp")
+    log_info "Found $count countries with data"
 
-    # Sort results
+    [[ $count -eq 0 ]] && { log_error "No data extracted"; return 1; }
+
+    # Sort: field 4 is the value
+    local sorted
     if [[ "$mode" == "top" ]]; then
-        sort -t, -k2 -nr "$tmp_file" | head -n "$n" > "$output_file"
+        sorted=$(sort -t'|' -k4 -rn "$temp" | head -n "$n")
     else
-        sort -t, -k2 -n "$tmp_file" | head -n "$n" > "$output_file"
+        sorted=$(sort -t'|' -k4 -n "$temp" | head -n "$n")
     fi
 
-    log_info "Saved ranked results to $output_file"
-    rm -f "$tmp_file"
+    # Output
+    {
+        echo "========================================"
+        echo "Ranking: ${mode^^} $n Countries - $year"
+        echo "Metric: $metric"
+        echo "========================================"
+        printf "%-5s %-25s %-10s %20s\n" "RANK" "COUNTRY" "CODE" "VALUE"
+        echo "----------------------------------------"
+
+        rank=1
+        echo "$sorted" | while IFS='|' read -r _ name code value; do
+            formatted=$(printf "%',.2f" "$value" 2>/dev/null || echo "$value")
+            printf "%-5s %-25s %-10s %20s\n" "#$rank" "$name" "$code" "$formatted"
+            ((rank++))
+        done
+
+        echo "========================================"
+    } | tee "$output_file"
+
 }
