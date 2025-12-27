@@ -57,8 +57,6 @@ log_info "Year: $YEAR | Metric: $METRIC | Mode: $MODE | N: $N"
 
 echo ""
 log_info "Step 1: Extracting raw data..."
-metric_key="$METRIC"
-METRIC="${METRIC_MAP[$metric_key]}"
 fetch_all_countries "$METRIC" "$YEAR" "$RAW_DIR"
 echo ""
 log_info "Step 2: Transforming data..."
