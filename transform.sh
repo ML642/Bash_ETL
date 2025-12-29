@@ -1,3 +1,9 @@
+#!/bin/bash
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
 transform_rank_countries() {
     local raw_dir="$1"
     local metric="$2"
@@ -6,21 +12,18 @@ transform_rank_countries() {
     local n="$5"
     local output_file="$6"
 
-    # Find the JSON file - try multiple patterns
+    local previous_year=$((year-1))
     local json_file=""
+    local prev_json_file=""
 
-    # Try pattern 1: with metric name
+    # Find current year file
     json_file=$(ls "$raw_dir"/*${metric}*${year}.json 2>/dev/null | head -1)
+    [[ ! -f "$json_file" ]] && json_file=$(ls "$raw_dir"/*${year}.json 2>/dev/null | head -1)
+    [[ ! -f "$json_file" ]] && json_file=$(ls "$raw_dir"/*.json 2>/dev/null | grep "$year" | head -1)
 
-    # Try pattern 2: just year (in case metric is in different format)
-    if [[ ! -f "$json_file" ]]; then
-        json_file=$(ls "$raw_dir"/*${year}.json 2>/dev/null | head -1)
-    fi
-
-    # Try pattern 3: any json file with the year
-    if [[ ! -f "$json_file" ]]; then
-        json_file=$(ls "$raw_dir"/*.json 2>/dev/null | grep "$year" | head -1)
-    fi
+    # Find previous year file
+    prev_json_file=$(ls "$raw_dir"/*${metric}*${previous_year}.json 2>/dev/null | head -1)
+    [[ ! -f "$prev_json_file" ]] && prev_json_file=$(ls "$raw_dir"/*${previous_year}.json 2>/dev/null | head -1)
 
     if [[ ! -f "$json_file" ]]; then
         log_error "No JSON file found in $raw_dir"
@@ -31,12 +34,13 @@ transform_rank_countries() {
     fi
 
     log_info "Processing: $json_file"
+    [[ -f "$prev_json_file" ]] && log_info "Previous year data: $prev_json_file"
 
     local temp=$(mktemp)
-    trap "rm -f $temp" RETURN
+    local temp_prev=$(mktemp)
+    trap "rm -f $temp $temp_prev" RETURN
 
-    # Extract all entries for the year in one pass
-    # Pattern: find lines with the year, extract country code and value
+    # Extract current year data
     grep "\"date\":\"$year\"" "$json_file" | \
         grep -o '"country":{"id":"[^"]*","value":"[^"]*"},"countryiso3code":"[^"]*","date":"'"$year"'","value":[0-9.]*' | \
         sed 's/"country":{"id":"//; s/","value":"/|/; s/"},"countryiso3code":"/|/; s/","date":"'"$year"'","value":/|/' | \
@@ -44,14 +48,19 @@ transform_rank_countries() {
 
     local count=$(wc -l < "$temp")
     log_info "Found $count entries with data"
-
     [[ $count -eq 0 ]] && { log_error "No data extracted"; return 1; }
 
-    # Filter out World Bank aggregates and regions (field 3 is the code)
-    # Keep only entries where the code field has exactly 3 uppercase letters AND is not an aggregate
+    # Extract previous year data if available
+    if [[ -f "$prev_json_file" ]]; then
+        grep "\"date\":\"$previous_year\"" "$prev_json_file" | \
+            grep -o '"country":{"id":"[^"]*","value":"[^"]*"},"countryiso3code":"[^"]*","date":"'"$previous_year"'","value":[0-9.]*' | \
+            sed 's/"country":{"id":"//; s/","value":"/|/; s/"},"countryiso3code":"/|/; s/","date":"'"$previous_year"'","value":/|/' | \
+            tr -d ',' > "$temp_prev"
+    fi
+
+    # Filter out World Bank aggregates
     local exclude="WLD|HIC|OED|PST|IBT|IBD|LMY|MIC|EAS|UMC|LTE|NAC|ECS|EAP|TEA|EUU|EMU|EAR|LMC|LCN|TLA|LAC|TEC|MEA|TSA|SAS|SSF|SSA|ARB|CSS|CEB|PRE|PSS|TMN|TSS|LIC|LDC|IDX|IDB|IDA|INX"
 
-    # Filter by checking if field 3 (code) matches any exclude pattern
     awk -F'|' -v ex="$exclude" '
         BEGIN { split(ex, arr, "|") }
         {
@@ -59,10 +68,8 @@ transform_rank_countries() {
             value = $4
             exclude_it = 0
 
-            # Skip if value is null or empty
             if (value == "null" || value == "" || value == "0") exclude_it = 1
 
-            # Check against exclude list
             for (i in arr) {
                 if (code == arr[i]) {
                     exclude_it = 1
@@ -70,7 +77,6 @@ transform_rank_countries() {
                 }
             }
 
-            # Also exclude if code is empty or not exactly 3 characters
             if (length(code) != 3) exclude_it = 1
 
             if (!exclude_it) print $0
@@ -78,9 +84,17 @@ transform_rank_countries() {
     ' "$temp" > "${temp}_filtered"
 
     local filtered_count=$(wc -l < "${temp}_filtered")
-    log_info "Filtered to $filtered_count actual countries"
+    log_success "Filtered to $filtered_count actual countries"
 
-    # Sort: field 4 is the value
+    # Build previous year lookup map
+    declare -A prev_values
+    if [[ -f "$prev_json_file" ]]; then
+        while IFS='|' read -r _ _ code value; do
+            [[ -n "$code" && -n "$value" && "$value" != "null" ]] && prev_values[$code]="$value"
+        done < "$temp_prev"
+    fi
+
+    # Sort data
     local sorted
     if [[ "$mode" == "top" ]]; then
         sorted=$(sort -t'|' -k4 -rn "${temp}_filtered" | head -n "$n")
@@ -88,14 +102,21 @@ transform_rank_countries() {
         sorted=$(sort -t'|' -k4 -n "${temp}_filtered" | head -n "$n")
     fi
 
-    # Output
+    # Output with growth column
     {
         echo "========================================"
         echo "Ranking: ${mode^^} $n Countries - $year"
         echo "Metric: $metric"
+        [[ -f "$prev_json_file" ]] && echo "YoY Growth: $previous_year → $year"
         echo "========================================"
-        printf "%-5s %-25s %-10s %20s\n" "RANK" "COUNTRY" "CODE" "VALUE"
-        echo "----------------------------------------"
+
+        if [[ -f "$prev_json_file" ]]; then
+            printf "%-5s %-20s %-8s %18s %12s\n" "RANK" "COUNTRY" "CODE" "VALUE" "GROWTH %"
+            echo "----------------------------------------------------------------------"
+        else
+            printf "%-5s %-25s %-10s %20s\n" "RANK" "COUNTRY" "CODE" "VALUE"
+            echo "----------------------------------------"
+        fi
 
         rank=1
         echo "$sorted" | while IFS='|' read -r _ name code value; do
@@ -105,11 +126,34 @@ transform_rank_countries() {
             fi
 
             formatted=$(printf "%',.2f" "$value" 2>/dev/null || echo "$value")
-            printf "%-5s %-25s %-10s %20s\n" "#$rank" "$name" "$code" "$formatted"
+
+            # Calculate growth if previous year data exists
+            if [[ -f "$prev_json_file" && -n "${prev_values[$code]}" ]]; then
+                prev="${prev_values[$code]}"
+                growth=$(awk -v curr="$value" -v prev="$prev" 'BEGIN {printf "%.2f", ((curr - prev) / prev) * 100}')
+
+                if (( $(echo "$growth >= 0" | bc -l 2>/dev/null || echo 0) )); then
+                    growth_str="+${growth}%"
+                    color=${GREEN}
+                else
+                    color=${RED}
+                    growth_str="${growth}%"
+                fi
+
+                printf "%-5s %-20s %-8s %18s" "#$rank" "$name" "$code" "$formatted"
+                echo -e "${color}$(printf '%12s' "$growth_str")${NC}\n"
+            else
+                if [[ -f "$prev_json_file" ]]; then
+                    printf "%-5s %-20s %-8s %18s %12s\n" "#$rank" "$name" "$code" "$formatted" "N/A"
+                else
+                    printf "%-5s %-25s %-10s %20s\n" "#$rank" "$name" "$code" "$formatted"
+                fi
+            fi
+
             ((rank++))
         done
 
         echo "========================================"
     } | tee "$output_file"
-
+     log_success "Results saved to: $output_file"
 }

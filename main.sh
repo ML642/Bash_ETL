@@ -45,6 +45,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+check_internet
+
+#log_error "Checking error style"
+#log_info "Checking info style"
+#log_success "Checking success style"
 
 require_arg "--year" "$YEAR"
 require_arg "--metric" "$METRIC"
@@ -58,6 +63,8 @@ log_info "Year: $YEAR | Metric: $METRIC | Mode: $MODE | N: $N"
 echo ""
 log_info "Step 1: Extracting raw data..."
 fetch_all_countries "$METRIC" "$YEAR" "$RAW_DIR"
+fetch_all_countries "$METRIC" "$((YEAR-1))" "$RAW_DIR"
+
 echo ""
 log_info "Step 2: Transforming data..."
 RESULT_FILE="$OUT_DIR/${MODE}n_${METRIC}_${YEAR}.csv"
@@ -75,5 +82,5 @@ log_info "Step 3: Loading results..."
 print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
 
 echo ""
-log_info "✓ ETL Complete!"
-echo "Output: $RESULT_FILE"
+log_success "✓ ETL Complete!"
+log_success "Output: $RESULT_FILE"
