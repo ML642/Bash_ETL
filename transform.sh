@@ -8,7 +8,7 @@ transform_rank_countries() {
     local raw_dir="$1"
     local metric="$2"
     local year="$3"
-    local mode="$4"    # "top" or "bottom"
+    local mode="$4"    
     local n="$5"
     local output_file="$6"
 
@@ -24,14 +24,6 @@ transform_rank_countries() {
     # Find previous year file
     prev_json_file=$(ls "$raw_dir"/*${metric}*${previous_year}.json 2>/dev/null | head -1)
     [[ ! -f "$prev_json_file" ]] && prev_json_file=$(ls "$raw_dir"/*${previous_year}.json 2>/dev/null | head -1)
-
-    if [[ ! -f "$json_file" ]]; then
-        log_error "No JSON file found in $raw_dir"
-        log_error "Looking for patterns: *${metric}*${year}.json or *${year}.json"
-        log_error "Files available:"
-        ls -lh "$raw_dir" 2>/dev/null || echo "Directory empty or not found"
-        return 1
-    fi
 
     log_info "Processing: $json_file"
     [[ -f "$prev_json_file" ]] && log_info "Previous year data: $prev_json_file"

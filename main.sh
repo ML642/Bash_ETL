@@ -1,11 +1,9 @@
 #!/bin/bash
-set -euo pipefail
 
 source ./utils.sh
 source ./config.sh
 source ./fetch_data.sh
 source ./transform.sh
-source ./load.sh
 source ./transform.sh
 
 DATA_DIR="./data"

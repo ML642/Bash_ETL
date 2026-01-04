@@ -20,7 +20,6 @@ Bash_ETL/
 ├── load.sh              # Report generation and output
 ├── utils.sh             # Shared utilities and logging
 ├── chron.sh             # Cron job scheduling helper
-├── run_example.sh       # Example usage script
 ├── data/                # Data storage directory
 │   ├── raw/            # Raw JSON responses from API
 │   └── output/         # Processed CSV results
