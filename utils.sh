@@ -91,10 +91,9 @@ require_positive_int() {
 require_year() {
   local year="$1"
 
-  if ! [[ "$year" =~ ^[0-9]{4}$ ]]; then
-    usage
-    error "Invalid year: $year"
-  fi
+  if (( year < 1950 || year > 2024 )); then
+     error "Year must be between 1950 and 2024: $year"
+ fi
 }
 
 print_report() {

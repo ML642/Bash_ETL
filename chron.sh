@@ -1,18 +1,29 @@
 #!/bin/bash
 
-echo "Running ETL..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CRON_CMD="0 2 1 * * /usr/bin/bash '$SCRIPT_DIR/main.sh' >> '$SCRIPT_DIR/logs/cron.log' 2>&1"
 
-schedule_cron() {
-    local cron_cmd="0 2 1 * * /usr/bin/bash $PWD/main.sh >> $PWD/logs/cron.log 2>&1"
 
-    # Check if the cron job already exists
-    crontab -l 2>/dev/null | grep -F "$PWD/main.sh" > /dev/null
-    
-    if [ $? -ne 0 ]; then
-        # Add the cron job
-        (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
-        echo "Cron job added: Runs main.sh monthly at 2:00 AM"
-    else
-        echo "Cron job already exists."
-    fi
+chrontab(){
+echo ""
+echo ""
+echo "ETL Cron Setup"
+echo "=============="
+
+if crontab -l 2>/dev/null | grep -qF "$SCRIPT_DIR/main.sh"; then
+    echo "Cron job already exists:"
+    crontab -l | grep -F "$SCRIPT_DIR/main.sh"
+    exit 0
+fi
+
+read -p "Schedule ETL to run monthly at 2 AM? (y/N): " answer
+
+if [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]; then
+    mkdir -p "$SCRIPT_DIR/logs"
+    (crontab -l 2>/dev/null; echo "$CRON_CMD") | crontab -
+    echo "✓ Cron job scheduled"
+    echo "Edit with: crontab -e"
+else
+    echo "Cron job not scheduled"
+fi
 }

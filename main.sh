@@ -1,9 +1,9 @@
 #!/bin/bash
 
+source ./chron.sh
 source ./utils.sh
 source ./config.sh
 source ./fetch_data.sh
-source ./transform.sh
 source ./transform.sh
 
 DATA_DIR="./data"
@@ -52,6 +52,7 @@ check_internet
 require_arg "--year" "$YEAR"
 require_arg "--metric" "$METRIC"
 require_arg "--topn|--leastn" "$MODE"
+require_year "$YEAR"
 require_positive_int "$N"
 validate_metric "$METRIC"
 
@@ -82,3 +83,5 @@ print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
 echo ""
 log_success "✓ ETL Complete!"
 log_success "Output: $RESULT_FILE"
+chrontab
+
