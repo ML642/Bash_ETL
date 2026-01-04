@@ -78,7 +78,7 @@ transform_rank_countries \
 
 echo ""
 log_info "Step 3: Loading results..."
-print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
+#print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
 
 echo ""
 log_success "✓ ETL Complete!"

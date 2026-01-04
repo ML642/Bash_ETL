@@ -107,7 +107,7 @@ transform_rank_countries() {
             echo "----------------------------------------------------------------------"
         else
             printf "%-5s %-25s %-10s %20s\n" "RANK" "COUNTRY" "CODE" "VALUE"
-            echo "----------------------------------------"
+            echo "----------------------------------------------------------------------"
         fi
 
         rank=1
@@ -133,11 +133,10 @@ transform_rank_countries() {
                 fi
 
                 printf "%-5s %-20s %-8s %18s" "#$rank" "$name" "$code" "$formatted"
-                echo -e "${color}$(printf '%12s' "$growth_str")${NC}\n"
+		echo "$(printf '%12s' "$growth_str")"
             else
                 if [[ -f "$prev_json_file" ]]; then
-                    printf "%-5s %-20s %-8s %18s %12s\n" "#$rank" "$name" "$code" "$formatted" "N/A"
-                else
+
                     printf "%-5s %-25s %-10s %20s\n" "#$rank" "$name" "$code" "$formatted"
                 fi
             fi
@@ -145,7 +144,7 @@ transform_rank_countries() {
             ((rank++))
         done
 
-        echo "========================================"
+	echo "======================================================================"
     } | tee "$output_file"
      log_success "Results saved to: $output_file"
 }
