@@ -1,0 +1,8 @@
+# Vim
+*.swp
+*.swo
+
+# Generated data
+data/output/
+data/raw/
+

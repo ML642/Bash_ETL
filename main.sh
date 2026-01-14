@@ -12,13 +12,23 @@ OUT_DIR="$DATA_DIR/output"
 
 mkdir -p "$RAW_DIR" "$OUT_DIR"
 
+NO_COLOR=0
 YEAR=""
 METRIC=""
 MODE=""
 N=""
+GROUP="countries"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --no-color)
+      NO_COLOR=1
+      shift
+      ;;
+    --group)
+      GROUP="$2"
+      shift 2
+      ;;
     --year)
       YEAR="$2"
       shift 2
@@ -34,6 +44,16 @@ while [[ $# -gt 0 ]]; do
       ;;
     --leastn)
       MODE="least"
+      N="$2"
+      shift 2
+      ;;
+    --topn-growth)
+      MODE="top-growth"
+      N="$2"
+      shift 2
+      ;;
+    --leastn-growth)
+      MODE="least-growth"
       N="$2"
       shift 2
       ;;
@@ -74,14 +94,12 @@ transform_rank_countries \
   "$YEAR" \
   "$MODE" \
   "$N" \
+  "$GROUP" \
   "$RESULT_FILE"
 
 echo ""
 log_info "Step 3: Loading results..."
-#print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N"
-
+print_report "$RESULT_FILE" "$METRIC" "$YEAR" "$MODE" "$N" "$NO_COLOR"
 echo ""
 log_success "✓ ETL Complete!"
 log_success "Output: $RESULT_FILE"
-chrontab
-

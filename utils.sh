@@ -102,17 +102,68 @@ print_report() {
     local year="$3"
     local mode="$4"
     local n="$5"
+    local no_color="${6:-0}"
 
     if [[ ! -f "$result_file" ]]; then
         log_error "Result file not found: $result_file"
         return 1
     fi
 
+    # Colors (terminal only)
+local GREEN='\033[0;32m'
+local RED='\033[0;31m'
+local YELLOW='\033[0;33m'
+local CYAN='\033[0;36m'
+local BOLD='\033[1m'
+local NC='\033[0m'
+
+    if [[ "$no_color" -eq 1 ]]; then
+        GREEN=""
+        RED=""
+        YELLOW=""
+        CYAN=""
+        BOLD=""
+        NC=""
+    fi
     echo ""
-    log_info "Top $n countries by $metric in $year ($mode):"
-    echo "-------------------------------------------"
-    column -t -s, "$result_file"
-    echo "-------------------------------------------"
+    echo -e "${BOLD}${CYAN}Top $n countries by $metric in $year (${mode})${NC}"
+    echo "--------------------------------------------------------------------------"
+
+    awk -F',' -v GREEN="$GREEN" -v RED="$RED" -v YELLOW="$YELLOW" -v NC="$NC" '
+    BEGIN {
+        printf "%-5s %-25s %-6s %-18s %-12s\n", \
+               "RANK", "COUNTRY", "CODE", "VALUE", "GROWTH %"
+        print "--------------------------------------------------------------------------"
+    }
+    NR > 1 {
+        rank = $1
+        country = $2
+        code = $3
+        value = $4
+        growth = $5
+
+        # Color logic
+        color = NC
+        growth_str = "N/A"
+
+        if (growth != "") {
+            if (growth > 0) {
+                color = GREEN
+                growth_str = "+" growth "%"
+            } else if (growth < 0) {
+                color = RED
+                growth_str = growth "%"
+            } else {
+                color = YELLOW
+                growth_str = "0.00%"
+            }
+        }
+
+        printf "%-5s %-25s %-6s %-18s %s%12s%s\n", \
+               rank, country, code, value, color, growth_str, NC
+    }' "$result_file"
+
+    echo "--------------------------------------------------------------------------"
 }
 
 validate_metric() {
